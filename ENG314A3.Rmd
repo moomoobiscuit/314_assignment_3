@@ -1,0 +1,126 @@
+---
+title: "ENGSCI 314 Assignment 3"
+author: "Your Name and ID number here"
+date: 'Due Date: 1pm Tuesday, 29th May 2018'
+output:
+  html_document:
+    fig_caption: yes
+  pdf_document: default
+  word_document: default
+---
+```{r echo=FALSE}
+## Do not delete this!
+## It loads the s20x library for you. If you delete it 
+## your document may not compile it.
+require(s20x)
+```
+
+##**Question 1**
+
+###Question of interest/goal of the study
+
+
+
+
+
+
+### Read in and inspect the data:
+```{r,fig.height=6,fig.width=6}
+game.df=read.table("game14.txt",header=TRUE)
+pairs20x(game.df[1:4])
+
+```
+
+
+
+
+
+### Fit model and check assumptions
+```{r,fig.height=3.8,fig.width=6}
+
+
+
+
+
+```
+
+### Create a plot with 'best' model superimposed on top of data.
+```{r,fig.height=5,fig.width=6}
+
+
+
+
+
+```
+
+### Rotate model for final comparison
+```{r,fig.height=3.8,fig.width=6}
+
+
+
+```
+
+
+### Method and Assumption Checks
+
+
+
+
+
+
+### Executive Summary
+
+
+
+
+
+
+****
+
+##**Question 2**
+
+### Question of interest/goal of the study
+
+
+
+
+
+### Read in and inspect the data:
+```{r,fig.height=5,fig.width=6}
+iron.df=read.table("Iron.txt",header=TRUE)
+interactionPlots(Iron~Pot+Food,data=iron.df)
+
+```
+
+
+
+
+
+
+
+### Fit model and check assumptions
+```{r,fig.height=3.5,fig.width=6}
+
+
+
+
+```
+
+### Method and Assumption Checks
+
+
+
+
+
+
+
+
+### Executive Summary
+
+
+
+
+
+
+
+
