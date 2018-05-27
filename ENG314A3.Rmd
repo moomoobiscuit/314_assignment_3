@@ -1,6 +1,6 @@
 ---
 title: "ENGSCI 314 Assignment 3"
-author: "Your Name and ID number here"
+author: "Navindd Raj 822790840"
 date: 'Due Date: 1pm Tuesday, 29th May 2018'
 output:
   html_document:
@@ -15,69 +15,193 @@ output:
 require(s20x)
 ```
 
-##**Question 1**
+## **Question 1**
 
-###Question of interest/goal of the study
+### Question of interest/goal of the study
 
-
-
-
-
+We want to find out what effect several different variables have on the length of time players survive in a game.
 
 ### Read in and inspect the data:
-```{r,fig.height=6,fig.width=6}
+```{r, fig.height = 6, fig.width = 6}
 game.df=read.table("game14.txt",header=TRUE)
+head(game.df)
 pairs20x(game.df[1:4])
-
 ```
 
+Response variable is time and the rest are explanatory variables. 
 
+We can see from the pairs plot that both speed and strategy are related to survival time, while background seems to have no apparent effect on time. We can see that there appears to be a non-linear trend in speed vs time, which we should look into later. There appears to be little correlation within the explanatory variables, so we aren't in danger of variable interaction. 
 
 
 
 ### Fit model and check assumptions
-```{r,fig.height=3.8,fig.width=6}
 
+We shouldn't have to worry about interaction between explanatory variables as there appears to be very little correlation here. Let's first fit a model using all of the explanatory variables to be sure of what is happenening, then progress to a simpler model if possible. 
 
+```{r}
+# fit the model
+game.fit = lm(Time ~ Speed + Strategy + Background, data = game.df)
 
-
-
+# assumption checks
+plot(game.fit, which = 1)
 ```
+
+Slight curvature spotted in the residuals, which could violate the equality of variance assumption. Will look into it later.
+```{r}
+normcheck(game.fit)
+```
+
+Normality check seems *okay*, it is not too wild but we have a large dataset so can invoke the CLT if necessary. There is evidence of right-skewed data though, which we should look into by maybe logging the response variable.
+```{r}
+cooks20x(game.fit)
+```
+
+No points of undue influence, can move on to next stage of analysis.
+```{r}
+# get fit summary info
+summary(game.fit)
+anova(game.fit)
+```
+
+As expected, we can see the p-values for background in the summary and anova table are very high and considered insignificant. In this case, it is safe to ditch the "Background" variable for future models. We can see that in relation to "StrategyHigh", StrategyLow has much more significance in trend than StrategyMedium, with StrategyMedium having a nonsignificant p-value. However, we should still keep the strategy variable in the model because of the strong significance from the StrategyLow p-value. We also see a curvature in the residuals plot, which we should adress later. There are no points of undue influence, and normality isn't bad. For now, let's re-fit the model without the background variable and see what changed, and how we can improve from there. 
+```{r}
+# fit simpler model with removed Background variable
+game.fit1 = lm(Time ~ Speed + Strategy, data = game.df)
+
+# assumption checks
+plot(game.fit1, which = 1)
+normcheck(game.fit1)
+```
+
+The curvature is still present in the residuals plot, and normality assumption checks hasn't changed.
+```{r}
+# get fit summary info
+summary(game.fit1)
+anova(game.fit1)
+```
+
+Now in the anova table, we can see that all of the explanatory variables used in the model are significant, so we can't remove any more variables. To confirm this, we should rotate the model for a final comparison, which will be done in it's own section later. Note that the Adjusted R-squared for this model has slightly improved, yet we have less variables, which is a good indicator that our simpler model is better than the previous one. 
+
+For now, we should focus on finding the cause of the curvature in the residuals, also considering the skewness of the data.
+
+```{r}
+# plot residuals of speed and strategy in the fitted model to see what is causing the curvature
+layout20x(1,2)
+plot(residuals(game.fit1) ~ Speed, main = 'Residual plot (Speed)', data = game.df)
+lines(lowess(game.df$Speed, residuals(game.fit1)))
+plot(residuals(game.fit1) ~ Strategy, main = 'Residual plot (Strategy)', data = game.df)
+lines(lowess(game.df$Strategy, residuals(game.fit1)))
+```
+
+The largest cause of curvature in the residuals seems to come from the "Speed" attribute. By looking at the pairs plot relating of time vs speed, we can see what appears to be an curved relationship, so let's now try and fit a model with quadratic Speed and see if the residuals are better. 
+```{r}
+# fit model with squared Speed
+game.fit2 = lm(Time ~ Speed + I(Speed^2) + Strategy, data = game.df)
+
+# assumption checks
+plot(game.fit2, which = 1)
+normcheck(game.fit2)
+cooks20x(game.fit2)
+```
+
+It seems like this has't really fixed the curvature issue from before, and there is still some doubt about the scatter of residuals. The normality check still doesn't seem to be terrible and still no points of undue influence. Again though, we see strong evidence of right-skewed data, so next let's try fit a logged response variable model to see if the assumption checks get better. 
+
+```{r}
+# fit model with logged response variable
+game.fit3 = lm(log(Time) ~ Speed + Strategy, data = game.df)
+
+# assumption checks
+plot(game.fit3, which = 1)
+normcheck(game.fit3)
+cooks20x(game.fit3)
+```
+
+The Q-Q plot looks a lot better now, as does the equality of variance checks and the normality check. Residuals have an almost constant scatter, which is what we want. There are still no points of undue influence.
+```{r}
+# get fit summary info 
+summary(game.fit3)
+anova(game.fit3)
+```
+
+Again, we can't move any further variables from this model anymore as they both have very strong p-values. Overall I think this is the best model for the given data, as the assumption checks are all satisfied perfectly by it, and it has the strongest Multiple R-Squared value of 0.6369. 
+
 
 ### Create a plot with 'best' model superimposed on top of data.
+
 ```{r,fig.height=5,fig.width=6}
+# generate series of fitted values for plot
+xVals = seq(0,9,0.1)
 
+yValsHigh = exp(game.fit3$coef[1] + game.fit3$coef[2]*xVals)
+yValsLow = exp(game.fit3$coef[1] + game.fit3$coef[2]*xVals + game.fit3$coef[3])
+yValsMed = exp(game.fit3$coef[1] + game.fit3$coef[2]*xVals + game.fit3$coef[4])
 
+palette(value=c('blue','red','green'))
+plot(Time ~ Speed, main = "Time Survived vs Speed of Game\n(for all strategy levels) - Log Model", data = game.df, col = game.df$StrategyC)
+lines(xVals, yValsHigh, col = "blue")
+lines(xVals, yValsLow, col = "red")
+lines(xVals, yValsMed, col = "green")
 
-
-
+legend("topright", legend = c("Low Difficulty", "Medium Difficulty", "High Difficulty"), col = c("red", "green", "blue"), pch = '_')
 ```
+
+
+Overall, it seems the log model fits the data well, and by observing the trends of each line colour we can see that survival time is not a simple linear trend for different strategy levels. Therefore, going forward our final model is the logged response variable one.
 
 ### Rotate model for final comparison
+
+We have shown that for this model, if we have Speed, then we also need Strategy, but what about the other way around? Let's rotate the model to find out:
 ```{r,fig.height=3.8,fig.width=6}
-
-
-
+# refit the model changing the variable order and show anova table
+game.fit4 = lm(log(Time) ~ Strategy + Speed, data = game.df)
+anova(game.fit4)
 ```
 
+As we can see, both variables are still significant and thus our model is complete.
+
+Let's also make a new model with Medium as the baseline, in order to compare the medium and low strategies, which will come useful for the executive summary.
+```{r}
+# create new factor variable
+game.df = within(game.df, {StrategyLow = factor(Strategy, levels=c('Low','Med','High'))})
+game.fit5 = lm(log(Time) ~ Speed + StrategyLow, data = game.df)
+summary(game.fit5)$coef
+anova(game.fit5)
+
+# confidence interval on log scale
+confint(game.fit5)
+
+# back transformed confidence interval for slope as percentage change
+100*(exp(confint(game.fit5)[3:4,])-1)
+```
+
+We find that the difference between medium and low is significant (p-value 2.59e-07). 
 
 ### Method and Assumption Checks
 
+As we have multiple explanatory variables, we have fitted a multiple linear regression model to the data. The initial residuals plot showed a distinct curve, meaning equality of variance assumption may have been violated in the initial model with all explanatory variables. After dropping the least significant variable "Background" (ANOVA Table p-value of 0.884), curvature was still present in the residuals plot. Investigating each explanatory variable, both Speed and Strategy vs their residuals were plotted, to see which one showed the most significant contribution to curvature. It seemed like "Speed" was the variable that was causing this quadratic curvature, but when a quadratic model was fitted with squared Speed, the residuals still did not look good, and the quantile-quantile plot still showed evidence of right-skewed data. Finally, we fit a model with logged response variable and this cleared all our assumption checks, showing good normality, and scatter of residuals was almost constant, meaning we have equality of variance. The data was taken from a large group of playtesters and each was randomly allocated to play a certain version of the game, so independence can be assumed with no issues. 
 
+After simplifying the model down by removing the "Background" variable, the remaining variables were significant and there were no problems with the assumptions of the model. The final model was also rotated to see the significance of one variable without the other, and it showed that both explanatory variables "Speed" and "Strategy" were required in the model. 
 
-
-
+Our model is: $log(Time_{i}) = \beta_{0} + \beta_{1}*Speed_{i} + \beta_{2}*StrategyLow_{i} + \beta_{3}*StrategyMedium_{i} + \epsilon_{i}$, where StrategyLow is a dummy variable that equals 1 if the strategy level was set to Low for datapoint i, 0 otherwise, and StrategyMedium is a dummy variable that equals 1 if the strategy level was set to Medium for datapoint i, 0 otherwise, and $\epsilon_{i} ~ iid N(0,\sigma^{2})$. The baseline strategy for this model is High, and so there is no dummy variable for when the strategy is set to High. 
 
 ### Executive Summary
 
+A manager of a software company which is developing a new game is interested in seeing what effect several different variables have on the length of time players survive in the game, in order to further develop the game. Data was collected by a large number of playtesters randomly allocated a game with specific settings.
 
+The final model used the "Speed" and "Strategy" setting of the game to see if there was a difference in the survival time as these two variables changed. It was found that the background setting for the game did not affect the survival time of players. 
 
+We see a general trend that as the speed setting of the game increases, the survival time decreases. However, this is not a straightforward linear trend; as speed decreases, survival time decreases less and less (even though it *is* still decreasing), i.e. increasing speed has a larger effect on survival time when speed is low, but not so large of an effect when speed is high. 
 
+There is also evidence that the strategy setting of the game will also affect the survival time. People playing on the low strategy level show significantly longer survival times than those playing on both a high or medium strategy level for the same speed. We found the median survival time on Medium strategy level was between 16.4% to 32.4% lower than those playing on the same speed on Low strategy level. We also found the medium survival time on High strategy level was between 20.4% to 35.2% lower than those playing on the same speed on Low strategy level. 
+
+There was no significant difference in survival time between people playing on Medium and High strategy levels, for the same speed. 
+
+This model explains about 64% of the variability in the survival times. 
 
 
 ****
 
-##**Question 2**
+## **Question 2**
 
 ### Question of interest/goal of the study
 
