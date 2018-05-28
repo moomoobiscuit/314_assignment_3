@@ -84,16 +84,7 @@ Now in the anova table, we can see that all of the explanatory variables used in
 
 For now, we should focus on finding the cause of the curvature in the residuals, also considering the skewness of the data.
 
-```{r}
-# plot residuals of speed and strategy in the fitted model to see what is causing the curvature
-layout20x(1,2)
-plot(residuals(game.fit1) ~ Speed, main = 'Residual plot (Speed)', data = game.df)
-lines(lowess(game.df$Speed, residuals(game.fit1)))
-plot(residuals(game.fit1) ~ Strategy, main = 'Residual plot (Strategy)', data = game.df)
-lines(lowess(game.df$Strategy, residuals(game.fit1)))
-```
-
-The largest cause of curvature in the residuals seems to come from the "Speed" attribute. By looking at the pairs plot relating of time vs speed, we can see what appears to be an curved relationship, so let's now try and fit a model with quadratic Speed and see if the residuals are better. 
+By looking at the pairs plot relating of time vs speed, we can see what appears to be an curved relationship as the largest cause of curvature, so let's now try and fit a model with quadratic Speed and see if the residuals are better. 
 ```{r}
 # fit model with squared Speed
 game.fit2 = lm(Time ~ Speed + I(Speed^2) + Strategy, data = game.df)
@@ -165,16 +156,17 @@ Let's also make a new model with Medium as the baseline, in order to compare the
 game.df = within(game.df, {StrategyLow = factor(Strategy, levels=c('Low','Med','High'))})
 game.fit5 = lm(log(Time) ~ Speed + StrategyLow, data = game.df)
 summary(game.fit5)$coef
-anova(game.fit5)
+```
 
+We find that the difference between medium and low is significant (p-value 2.59e-07). We should get the confidence intervals for our executive summary too:
+```{r}
 # confidence interval on log scale
 confint(game.fit5)
 
 # back transformed confidence interval for slope as percentage change
-100*(exp(confint(game.fit5)[3:4,])-1)
+100*(exp(confint(game.fit5)[2:4,])-1)
 ```
 
-We find that the difference between medium and low is significant (p-value 2.59e-07). 
 
 ### Method and Assumption Checks
 
@@ -192,9 +184,11 @@ The final model used the "Speed" and "Strategy" setting of the game to see if th
 
 We see a general trend that as the speed setting of the game increases, the survival time decreases. However, this is not a straightforward linear trend; as speed decreases, survival time decreases less and less (even though it *is* still decreasing), i.e. increasing speed has a larger effect on survival time when speed is low, but not so large of an effect when speed is high. 
 
-There is also evidence that the strategy setting of the game will also affect the survival time. People playing on the low strategy level show significantly longer survival times than those playing on both a high or medium strategy level for the same speed. We found the median survival time on Medium strategy level was between 16.4% to 32.4% lower than those playing on the same speed on Low strategy level. We also found the medium survival time on High strategy level was between 20.4% to 35.2% lower than those playing on the same speed on Low strategy level. 
+We found that the median survival time decreases by between 13.8% to 16.6% per unit increase of speed, regardless of the strategy level played. 
 
-There was no significant difference in survival time between people playing on Medium and High strategy levels, for the same speed. 
+There is also evidence that the strategy setting of the game will also affect the survival time. People playing on the low strategy level show significantly longer survival times than those playing on both a high or medium strategy level for the same speed. We found the median survival time on Medium strategy level was between 16.4% to 32.4% lower than those playing on the same speed on Low strategy level. We also found the median survival time on High strategy level was between 20.4% to 35.2% lower than those playing on the same speed on Low strategy level. 
+
+There was no significant difference in survival time between people playing on Medium and High strategy levels, for the same speed setting. 
 
 This model explains about 64% of the variability in the survival times. 
 
@@ -205,42 +199,92 @@ This model explains about 64% of the variability in the survival times.
 
 ### Question of interest/goal of the study
 
-
-
-
+We are interested in seeing whether or not food cooked in different types of pots have different iron contents, and if these differences also depend on the type of food cooked. 
 
 ### Read in and inspect the data:
 ```{r,fig.height=5,fig.width=6}
 iron.df=read.table("Iron.txt",header=TRUE)
 interactionPlots(Iron~Pot+Food,data=iron.df)
-
 ```
 
+The profiles of the interaction plot do not appear to be parallel, indicating the possibility of an interaction between type of food and type of pot used. The iron content in meat dishes seem to be, on average, larger than those in vegetable dishes comparatively, with a larger difference in iron content with meat cooked in iron pots, versus vegetables cooked in iron pots. The variance of the observations seemed to be similar for each group. 
 
-
-
-
-
+Let's try and fit an interaction model and see if this is a good fit for our data.
 
 ### Fit model and check assumptions
+
 ```{r,fig.height=3.5,fig.width=6}
+# fit the model with interaction
+iron.fit = lm(Iron ~ Pot * Food, data = iron.df)
 
-
-
-
+# assumption checks
+plot(iron.fit, which = 1)
 ```
+
+Reasonably constant scatter of residuals. May be some doubt about datapoint 6, which we shall look into later.
+```{r}
+normcheck(iron.fit)
+```
+
+Q-Q plot looks reasonably good, data appears to be relatively normally distributed with most points in the centre of the distribution. *Possible* hints of skewness, but should be fine. One thing to note is that our dataset is relatively small (only 24 observations), so we can't confidently invoke the CLT if necessary. 
+```{r}
+cooks20x(iron.fit)
+```
+
+Points 6 has an apparently high Cook's Distance, which we could look into in the final model by removing this point to see if our model changes significantly. Should be fine for now though, as none have a Cook's Distance of over 0.40. 
+
+```{r}
+# get summary output
+anova(iron.fit)
+summary2way(iron.fit, page = "interaction")
+```
+
+We have significant p-values for iron level differences within iron pots for meat and vegetables, and between iron pots and aluminium pots for meat and vegetables, and iron pots and clay pots for meat and vegetables. There is no significant iron level difference between clay and aluminium pots for meat or vegetables. 
+```{r}
+summary(iron.fit)
+```
+
+We should also check for the anomalous datapoint 6 to see if it has undue influence on our model:
+```{r}
+# fit interaction model without datapoint 6
+iron.fit2 = lm(Iron ~ Pot * Food, data = iron.df[-6,])
+
+# compare the models to see if the estimates change by more than one standard error
+summary(iron.fit)$coef
+summary(iron.fit2)$coef
+```
+
+We can see that the PotClay estimate has changed by 0.299, with a standard error of 0.311, and the PotClay:FoodVegetables estimate has changed by 0.299, with a standard error of 0.441. Overall, the estimates have not changed by over one standard error for any confidence interval estimate, so we shall give this datapoint the benefit of the doubt and keep it in the final model. If we wanted to make a more accurate model with less doubt, we could collect more data in this region (clay pot type) to see if this is really an outlier or not. 
 
 ### Method and Assumption Checks
 
+We have two categorical explanatory variables so we have fitted a two-way ANOVA model. When we checked for interaction, we found a significant interaction, so could not simplify our model (we can't drop either variable as there is an interaction between the two explanatory variables). 
 
+There was a datapoint of potentially undue influence, but when we investigated this, it seemed that it did not affect the model as much as to change the difference in estimates by more than one standard error, so applying the benefit of the doubt for this datapoint, we kept it in the model. 
 
-
-
-
-
+We fitted the linear interaction model: $Iron_{ijk} = \mu + \alpha_{i} + \beta_{j} + \gamma_{ij} + \epsilon_{ijk}$, where $\mu$ is the overall mean iron content of all the food, $\alpha_{i}$ is the effect of the ith pot type (Aluminium, Clay or Iron) and $\beta_{j}$ is the effect of the jth food type (Meat or Vegetable), $\gamma_{ij}$ is the interaction effect for the combination of ith pot type and jth food type, and $\epsilon_{ijk} \text{ ~ } iid N(0,\sigma^{2})$. 
 
 ### Executive Summary
 
+Our interest is to see if there is a difference in iron content of food cooked in different types of pots, and if these differences also depended on the type of food cooked in the pot. 
+
+We found evidence that both the type of pot and type of food affect the iron content of the food cooked, but the effects of the type of food cooked differ depending on the type of pot used, so we can't assess the effects of pot type and food type separately due to this interaction. 
+
+Firstly, comparing the types of food cooked within the three pots,  the only significant difference we found was that in iron pots, the iron content of meat is greater than that of vegetables. We estimate that for food cooked in iron pots, the iron content of vegetables was between 0.9 to 2.9 mg/100g less than the iron content found in meat. 
+
+Secondly, comparing between pots for the different types of food, we found strong evidence that there is a difference in iron content of meat *and* vegetables cooked in iron pots vs clay pots *and* aluminium pots. Putting numbers to this statement, we estimate that:
+
+  * For meat:
+    * the iron content found in meat cooked in iron pots is between 1.6 to 3.6 mg/100g more than that found in meat cooked in aluminium pots
+    * the iron content found in meat cooked in iron pots is between 1.5 to 3.5 mg/100g more than that found in meat cooked in clay pots
+    
+  * For vegetables: 
+    * the iron content found in vegetables cooked in iron pots is between 0.6 to 2.5 mg/100g more than that found in vegetables cooked in           aluminium pots
+    * the iron content found in vegetables cooked in iron pots is between 0.3 to 2.3 mg/100g more than that found in vegetables cooked in           clay pots
+  
+Finally, we did not find any evidence of any differences in iron content of food cooked in clay and aluminium pots when comparing the two types of foods. 
+
+Our model explains about 90% of the variation in the data. 
 
 
 
